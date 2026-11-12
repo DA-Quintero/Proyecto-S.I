@@ -1,0 +1,22 @@
+# Test de regresión sobre la versión corregida
+# Fecha: 2026-11-12 15:09:05
+# Comando: python -m unittest tests.test_regresion_idor -v
+# Código de salida: 0
+
+test_01_factura_propia_200_con_datos (tests.test_regresion_idor.TestRegresionIDOR)
+Benito consulta su factura 2001 -> 200 con sus datos. ... ok
+test_02_propietaria_conserva_acceso (tests.test_regresion_idor.TestRegresionIDOR)
+Alicia sigue viendo sus facturas 1001-1004 (el parche no rompe el acceso legítimo). ... ok
+test_03_factura_ajena_403_sin_datos (tests.test_regresion_idor.TestRegresionIDOR)
+Con el token de Benito, las facturas de Alicia -> 403 sin datos del objeto. ... ok
+test_04_documento_ajeno_sigue_protegido (tests.test_regresion_idor.TestRegresionIDOR)
+Documento 5001 de Alicia con el token de Benito -> 403 sin datos (antes y después). ... ok
+test_05_sin_token_401 (tests.test_regresion_idor.TestRegresionIDOR)
+Sin sesión la factura 1001 -> 401 sin datos. ... ok
+test_06_listado_solo_propio (tests.test_regresion_idor.TestRegresionIDOR)
+El listado de Benito solo incluye su factura 2001. ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.812s
+
+OK

@@ -1,0 +1,18 @@
+# Tabla comparativa antes/después
+# Fecha: 2026-11-12 15:09:05
+# Comando: python scripts/verificar_antes_despues.py
+# Código de salida: 0
+
+caso                           | recurso        | antes         | después       | ¿datos ajenos después?
+--------------------------------------------------------------------------------------------------------
+Objeto propio autorizado       | factura 2001   | 200 con datos | 200 con datos | No aplica
+Objeto ajeno que exponía info. | factura 1001   | 200 con datos | 403 sin datos | No
+Objeto ajeno que exponía info. | factura 1002   | 200 con datos | 403 sin datos | No
+Objeto ajeno que exponía info. | factura 1003   | 200 con datos | 403 sin datos | No
+Objeto ajeno que exponía info. | factura 1004   | 200 con datos | 403 sin datos | No
+Objeto ajeno ya protegido      | documento 5001 | 403 sin datos | 403 sin datos | No
+--------------------------------------------------------------------------------------------------------
+validar_idor.py (código)       |                | 1             | 0             |
+test de regresión              |                | FALLA         | PASA          |
+
+CRITERIO DE CIERRE: CUMPLIDO — el mismo token que obtenía facturas ajenas recibe 403 sin datos y el acceso a la factura propia sigue funcionando.

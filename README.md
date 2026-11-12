@@ -48,7 +48,10 @@ python validar_idor.py          # antes del parche: detecta IDOR y termina con c
 │   └── .env.example     Plantilla de credenciales de prueba (copiar a .env)
 ├── scripts/
 │   ├── validar_idor.py  Validación controlada (recorre objetos ajenos con una sesión)
+│   ├── verificar_antes_despues.py  Ejecuta script + test sobre ambas versiones
 │   └── evidencias/      Salidas reales de referencia (línea base "antes del parche")
+├── tests/
+│   └── test_regresion_idor.py  Test de regresión (falla antes, pasa después)
 └── docs/
     ├── preparacion.md             Arquitectura, cuentas, objetos y matriz de permisos
     └── instrucciones_ejecucion.md Procedimiento y tabla de resultados
@@ -105,11 +108,25 @@ en cada ruta.
 - `scripts/evidencias/05_antes_parche_integrante2.txt`
 - `scripts/evidencias/06_despues_parche_integrante2.txt`
 
-### Integrante 3 — Pruebas y verificación
-- Crea el **test de regresión** (falla con la app vulnerable, pasa con la corregida).
-- Usa `scripts/validar_idor.py` (código de salida 1 = vulnerable, 0 = corregido) y
-  `scripts/evidencias/` como línea base del "antes".
-- Mantén los **mismos identificadores** en ambas ejecuciones y guarda las salidas antes/después.
+### Integrante 3 — Pruebas y verificación (completada)
+
+Test de regresión y verificación del mismo script antes y después del parche,
+desde un estado limpio (copia temporal de la app, `.env` de ejemplo y base nueva).
+
+```bash
+python scripts/verificar_antes_despues.py            # antes (262f30c) vs. después, guarda evidencias 07–11
+python -m unittest tests.test_regresion_idor -v      # solo el test, sobre la versión actual
+```
+
+| | Antes del parche | Después del parche |
+|---|---|---|
+| Factura propia 2001 | 200 con datos | 200 con datos |
+| Facturas ajenas 1001–1004 | 200 con datos | 403 sin datos |
+| Documento ajeno 5001 | 403 | 403 |
+| `validar_idor.py` | código 1 | código 0 |
+| Test de regresión | FALLA (4 fallos) | PASA (6/6) |
+
+**Evidencias:** `scripts/evidencias/07` a `11` · **Documentación:** `docs/pruebas_y_verificacion_integrante3.md`
 
 ## Nota de alcance
 Entorno **académico y local** (127.0.0.1). Datos y credenciales ficticios. No desplegar en
