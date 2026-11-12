@@ -12,20 +12,21 @@ sobre ella una vulnerabilidad de control de acceso (IDOR), corregirla con una
 política centralizada y verificar el parche. (El curso no proporciona una app;
 la aplicación a evaluar es esta, creada como parte del proyecto.)
 
-Estado del código en este punto del proyecto (ANTES del parche)
+Estado del código (DESPUÉS del parche del Integrante 2)
 ---------------------------------------------------------------
-La aplicación es DELIBERADAMENTE VULNERABLE a IDOR (CWE-639) en el endpoint de
-detalle de facturas: `GET /api/invoices/<id>` comprueba la AUTENTICACIÓN pero NO
-la AUTORIZACIÓN sobre el objeto (no verifica que la factura pertenezca al usuario
-de la sesión). Para contraste pedagógico, el endpoint de documentos
-`GET /api/documents/<id>` SÍ comprueba la propiedad: muestra que el patrón
-correcto existía en el código y que el fallo en facturas es una omisión.
+La aplicación cuenta con una política centralizada de autorización
+que comprueba la propiedad de los recursos antes de entregarlos.
+Los endpoints de detalle de facturas y documentos utilizan la
+misma función de autorización.
+
+Si un usuario intenta consultar un recurso ajeno, el servidor
+responde HTTP 403 sin exponer los datos del objeto.
 
 Separación de responsabilidades (Guía P01)
 -------------------------------------------
 - Integrante 1 (este entregable): construye la app, prepara cuentas/objetos y
   REPRODUCE el fallo. NO implementa el parche ni el test de regresión.
-- Integrante 2: implementará la política centralizada de autorización (middleware
+- Integrante 2: Implementó la política centralizada de autorización (middleware
   único) sobre el endpoint vulnerable. Punto de extensión señalado en el código.
 - Integrante 3: creará el test de regresión (antes falla / después pasa).
 
@@ -48,7 +49,7 @@ API
   POST /api/login             -> {username, password} => {token, user_id, nombre}
   GET  /api/me                -> perfil del usuario autenticado
   GET  /api/invoices          -> lista SOLO las facturas propias (correcto)
-  GET  /api/invoices/<id>     -> VULNERABLE IDOR: no comprueba propiedad
+  GET  /api/invoices/<id>     -> PROTEGIDO: verifica la propiedad (403 si es ajeno)
   GET  /api/documents         -> lista SOLO los documentos propios (correcto)
   GET  /api/documents/<id>    -> PROTEGIDO: comprueba propiedad (403 si ajeno)
   GET  /                      -> interfaz web de demostración (web/index.html)
@@ -229,6 +230,33 @@ class Handler(BaseHTTPRequestHandler):
             f"[ACCESO] {ahora_iso()} user={quien} {self.command} {self.path} "
             f"-> {estado} {extra}\n")
 
+
+    # Política centralizada de autorización - Integrante 2
+    def _autorizar_objeto(self, usuario, objeto, accion="leer"):
+        """
+        Comprueba si el usuario autenticado tiene permiso
+        para realizar una acción sobre un recurso.
+        """
+
+        # Solo se permite lectura del recurso por su propietario.
+        autorizado = (
+            accion == "leer"
+            and objeto["user_id"] == usuario["id"]
+        )
+
+        if autorizado:
+            return True
+
+        # Registrar el acceso denegado sin exponer datos privados.
+        self._acceso(
+            usuario,
+            403,
+            f"objeto={objeto['id']} accion={accion} denegado"
+        )
+
+        self._json(403, {"error": "No autorizado"})
+        return False
+
     def log_message(self, fmt, *args):
         pass  # se usa _acceso para un log con contexto de autorización
 
@@ -310,28 +338,28 @@ class Handler(BaseHTTPRequestHandler):
                     self._acceso(usuario, 404)
                     return self._json(404, {"error": "Factura no encontrada"})
 
-                # ===========================================================
-                #  VULNERABILIDAD IDOR (CWE-639)  — endpoint de facturas
-                #  Se comprueba la AUTENTICACIÓN (usuario is not None) pero
-                #  NO la AUTORIZACIÓN sobre el objeto: falta comparar
-                #  f["user_id"] con usuario["id"].
-                #
-                #  >>> PUNTO DE EXTENSIÓN PARA EL INTEGRANTE 2 <<<
-                #  La política centralizada de autorización debe insertarse
-                #  aquí (y reutilizarse en las demás rutas de objetos), p. ej.:
-                #      if f["user_id"] != usuario["id"]:
-                #          return self._json(403, {"error": "No autorizado"})
-                #  El Integrante 1 NO la implementa, para conservar el estado
-                #  vulnerable que se demuestra.
-                # ===========================================================
-                ajeno = f["user_id"] != usuario["id"]
-                self._acceso(usuario, 200,
-                             f"factura={f['id']} owner={f['user_id']}"
-                             + (" [IDOR: objeto ajeno expuesto]" if ajeno else ""))
-                return self._json(200, {"id": f["id"], "numero": f["numero"],
-                                        "concepto": f["concepto"], "monto": f["monto"],
-                                        "fecha": f["fecha"],
-                                        "propietario_user_id": f["user_id"]})
+                # Corrección IDOR (CWE-639) - Integrante 2
+                # La política centralizada comprueba la propiedad
+                # del recurso antes de permitir su consulta.
+                if not self._autorizar_objeto(usuario, f):
+                    return
+
+                # Registrar el acceso autorizado.
+                self._acceso(
+                    usuario, 200,
+                    f"factura={f['id']} acceso autorizado"
+                )
+
+                # Entregar la factura únicamente al propietario.
+                return self._json(200, {
+                    "id": f["id"],
+                    "numero": f["numero"],
+                    "concepto": f["concepto"],
+                    "monto": f["monto"],
+                    "fecha": f["fecha"],
+                    "propietario_user_id": f["user_id"]
+                })
+
 
             # ---- Documentos (patrón CORRECTO: comprueba propiedad) ----
             if self.path == "/api/documents":
@@ -349,11 +377,13 @@ class Handler(BaseHTTPRequestHandler):
                 if d is None:
                     self._acceso(usuario, 404)
                     return self._json(404, {"error": "Documento no encontrado"})
-                # CORRECTO: comprobación de propiedad ANTES de entregar el objeto.
-                if d["user_id"] != usuario["id"]:
-                    self._acceso(usuario, 403, f"documento={d['id']} owner={d['user_id']} denegado")
-                    return self._json(403, {"error": "No autorizado"})
-                self._acceso(usuario, 200, f"documento={d['id']}")
+                # Aplicar la misma política centralizada a los documentos.
+                if not self._autorizar_objeto(usuario, d):
+                    return
+
+                # Registrar el acceso autorizado al documento.
+                self._acceso(usuario, 200, f"documento={d['id']} acceso autorizado")
+
                 return self._json(200, {"id": d["id"], "titulo": d["titulo"],
                                         "contenido": d["contenido"], "fecha": d["fecha"],
                                         "propietario_user_id": d["user_id"]})
