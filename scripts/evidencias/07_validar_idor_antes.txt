@@ -1,0 +1,35 @@
+# validar_idor.py sobre la versión vulnerable (262f30c)
+# Fecha: 2026-11-12 15:09:05
+# Comando: python scripts/validar_idor.py
+# Código de salida: 1
+
+==============================================================================
+ VALIDACIÓN CONTROLADA DE IDOR · P01 Integrante 1 · Portal de Facturas UAO
+==============================================================================
+ URL base        : http://127.0.0.1:62982
+ Usuario sesión  : bob
+
+[OK] Autenticado como 'bob' (user_id=2).
+     Token de sesión: b7ad…(44 ocultos)
+
+------------------------------------------------------------------------------
+ RESULTADOS (sesión única del Usuario B)
+------------------------------------------------------------------------------
+caso                           | recurso        | esperado      | HTTP | datos | veredicto
+------------------------------------------------------------------------------------------
+Objeto propio autorizado       | factura 2001   | 200 con datos |  200 | SÍ    | OK (acceso legítimo)
+Objeto ajeno que exponía info. | factura 1001   | 403 sin datos |  200 | SÍ    | IDOR: acceso indebido
+Objeto ajeno que exponía info. | factura 1002   | 403 sin datos |  200 | SÍ    | IDOR: acceso indebido
+Objeto ajeno que exponía info. | factura 1003   | 403 sin datos |  200 | SÍ    | IDOR: acceso indebido
+Objeto ajeno que exponía info. | factura 1004   | 403 sin datos |  200 | SÍ    | IDOR: acceso indebido
+Objeto ajeno ya protegido      | documento 5001 | 403 sin datos |  403 | no    | correcto (denegado)
+------------------------------------------------------------------------------------------
+
+[EVIDENCIA] Con el token de 'bob' se obtuvo HTTP 200 y datos de la factura 1001 (propietario Usuario A):
+            numero=FAC-A-1001  concepto='Servicios de consultoría'  monto=1520000.0  propietario_user_id=1
+
+==============================================================================
+ RESULTADO: VULNERABLE a IDOR — 4 factura(s) ajena(s) expuesta(s) con 200 y datos.
+ El endpoint de facturas NO comprueba la propiedad del objeto (CWE-639).
+ (El endpoint de documentos sí la comprueba: 403 en el objeto ajeno protegido.)
+==============================================================================
