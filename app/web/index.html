@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal de Facturas UAO</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --muted:#94a3b8; --text:#e2e8f0;
+    --accent:#38bdf8; --ok:#22c55e; --bad:#ef4444; --line:#334155;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:18px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+  header h1{font-size:18px;margin:0}
+  .tag{font-size:11px;padding:3px 8px;border-radius:999px;background:#7f1d1d;color:#fecaca;font-weight:600}
+  main{max-width:860px;margin:0 auto;padding:24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
+  h2{font-size:15px;margin:0 0 14px;color:var(--accent);letter-spacing:.3px}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:#0b1220;color:var(--text);font-size:14px}
+  button{margin-top:14px;padding:10px 16px;border:0;border-radius:8px;background:var(--accent);color:#082f49;font-weight:700;cursor:pointer}
+  button.sec{background:#334155;color:var(--text)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .row>div{flex:1;min-width:140px}
+  pre{background:#0b1220;border:1px solid var(--line);border-radius:8px;padding:14px;overflow:auto;font-size:13px;white-space:pre-wrap}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700}
+  .pill.ok{background:#064e3b;color:#6ee7b7}
+  .pill.bad{background:#7f1d1d;color:#fecaca}
+  .muted{color:var(--muted);font-size:12px}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .hidden{display:none}
+  code{background:#0b1220;padding:1px 6px;border-radius:5px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Portal de Facturas UAO</h1>
+  <span class="tag">Entorno de demostración · P01</span>
+</header>
+<main>
+
+  <!-- Login -->
+  <section class="card" id="loginCard">
+    <h2>Iniciar sesión</h2>
+    <div class="row">
+      <div>
+        <label for="u">Usuario</label>
+        <input id="u" placeholder="usuario" autocomplete="username">
+      </div>
+      <div>
+        <label for="p">Contraseña</label>
+        <input id="p" type="password" placeholder="contraseña" autocomplete="current-password">
+      </div>
+    </div>
+    <button id="btnLogin">Entrar</button>
+    <p class="hint">Credenciales de prueba definidas en <code>.env</code> (Usuario A y Usuario B).
+       Inicia sesión con el <b>Usuario B</b> para reproducir el acceso indebido.</p>
+    <pre id="loginMsg" class="hidden"></pre>
+  </section>
+
+  <!-- Panel autenticado -->
+  <section class="hidden" id="panel">
+    <div class="card">
+      <h2>Sesión</h2>
+      <div id="who" class="muted"></div>
+      <button class="sec" id="btnLogout" style="margin-top:12px">Cerrar sesión</button>
+    </div>
+
+    <div class="card">
+      <h2>Mis facturas (endpoint acotado al propietario)</h2>
+      <div id="misFacturas" class="muted">Cargando…</div>
+    </div>
+
+    <div class="card">
+      <h2>Consultar factura por ID &nbsp;<span class="muted">GET /api/invoices/&lt;id&gt;</span></h2>
+      <div class="row">
+        <div>
+          <label for="fid">ID de factura</label>
+          <input id="fid" type="number" placeholder="p. ej. 2001 (propia) o 1001 (ajena)">
+        </div>
+        <button id="btnFactura">Consultar</button>
+      </div>
+      <p class="hint">Demostración IDOR: con la sesión del Usuario B, consulta primero tu factura
+         (<code>2001</code>) y luego cambia el ID por uno del Usuario A (<code>1001</code>–<code>1004</code>).
+         La app devuelve <b>200 con los datos ajenos</b> porque no comprueba la propiedad.</p>
+      <div id="facturaResult"></div>
+    </div>
+
+    <div class="card">
+      <h2>Consultar documento por ID &nbsp;<span class="muted">GET /api/documents/&lt;id&gt;</span></h2>
+      <div class="row">
+        <div>
+          <label for="did">ID de documento</label>
+          <input id="did" type="number" placeholder="p. ej. 5002 (propio) o 5001 (ajeno)">
+        </div>
+        <button id="btnDoc">Consultar</button>
+      </div>
+      <p class="hint">Contraste: este endpoint <b>sí</b> comprueba la propiedad. Con el Usuario B,
+         el documento ajeno <code>5001</code> responde <b>403 sin datos</b>.</p>
+      <div id="docResult"></div>
+    </div>
+  </section>
+
+</main>
+<script>
+let TOKEN = null;
+
+async function api(path, opts={}){
+  opts.headers = Object.assign({'Accept':'application/json'}, opts.headers||{});
+  if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+  const r = await fetch(path, opts);
+  let body; try { body = await r.json(); } catch { body = {}; }
+  return { status:r.status, body };
+}
+
+function show(el, status, body){
+  const ok = status>=200 && status<300;
+  const pill = `<span class="pill ${ok?'ok':'bad'}">HTTP ${status}</span>`;
+  el.innerHTML = pill + '<pre>'+ JSON.stringify(body, null, 2) +'</pre>';
+}
+
+document.getElementById('btnLogin').onclick = async () => {
+  const username = document.getElementById('u').value.trim();
+  const password = document.getElementById('p').value;
+  const msg = document.getElementById('loginMsg');
+  const { status, body } = await api('/api/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username, password})
+  });
+  if (status===200 && body.token){
+    TOKEN = body.token;
+    document.getElementById('loginCard').classList.add('hidden');
+    document.getElementById('panel').classList.remove('hidden');
+    document.getElementById('who').textContent =
+      `Autenticado como ${body.nombre} (user_id=${body.user_id}).`;
+    cargarFacturas();
+  } else {
+    msg.classList.remove('hidden');
+    msg.textContent = `No se pudo iniciar sesión (HTTP ${status}).`;
+  }
+};
+
+document.getElementById('btnLogout').onclick = () => location.reload();
+
+async function cargarFacturas(){
+  const { body } = await api('/api/invoices');
+  const cont = document.getElementById('misFacturas');
+  const list = (body.invoices||[]);
+  if (!list.length){ cont.textContent = 'Sin facturas.'; return; }
+  cont.innerHTML = '<table><tr><th>ID</th><th>Número</th><th>Concepto</th><th>Monto</th><th>Fecha</th></tr>'
+    + list.map(f=>`<tr><td>${f.id}</td><td>${f.numero}</td><td>${f.concepto}</td><td>${f.monto.toLocaleString('es-CO')}</td><td>${f.fecha}</td></tr>`).join('')
+    + '</table>';
+}
+
+document.getElementById('btnFactura').onclick = async () => {
+  const id = document.getElementById('fid').value.trim();
+  if (!id) return;
+  const { status, body } = await api('/api/invoices/'+encodeURIComponent(id));
+  show(document.getElementById('facturaResult'), status, body);
+};
+
+document.getElementById('btnDoc').onclick = async () => {
+  const id = document.getElementById('did').value.trim();
+  if (!id) return;
+  const { status, body } = await api('/api/documents/'+encodeURIComponent(id));
+  show(document.getElementById('docResult'), status, body);
+};
+</script>
+</body>
+</html>

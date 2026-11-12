@@ -1,0 +1,13 @@
+LOG DE ACCESO DEL SERVIDOR — Evidencia P01 Integrante 1
+App: Portal de Facturas UAO. Generado por la propia aplicación (stderr).
+Muestra, del lado servidor, el acceso con 200 a objetos ajenos (IDOR) y el
+403 del endpoint protegido. Ejecución real del script (sesión del Usuario B).
+========================================================================
+
+[ACCESO] 2026-11-12T14:01:14Z user=anónimo POST /api/login -> 200 login=bob
+[ACCESO] 2026-11-12T14:01:14Z user=bob GET /api/invoices/2001 -> 200 factura=2001 owner=2
+[ACCESO] 2026-11-12T14:01:14Z user=bob GET /api/invoices/1001 -> 200 factura=1001 owner=1 [IDOR: objeto ajeno expuesto]
+[ACCESO] 2026-11-12T14:01:14Z user=bob GET /api/invoices/1002 -> 200 factura=1002 owner=1 [IDOR: objeto ajeno expuesto]
+[ACCESO] 2026-11-12T14:01:14Z user=bob GET /api/invoices/1003 -> 200 factura=1003 owner=1 [IDOR: objeto ajeno expuesto]
+[ACCESO] 2026-11-12T14:01:14Z user=bob GET /api/invoices/1004 -> 200 factura=1004 owner=1 [IDOR: objeto ajeno expuesto]
+[ACCESO] 2026-11-12T14:01:14Z user=bob GET /api/documents/5001 -> 403 documento=5001 owner=1 denegado

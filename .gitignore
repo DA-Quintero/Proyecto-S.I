@@ -1,0 +1,7 @@
+# Artefactos locales (no versionables)
+.env
+*.db
+*.log
+__pycache__/
+*.pyc
+.DS_Store

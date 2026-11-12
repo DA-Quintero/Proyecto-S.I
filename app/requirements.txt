@@ -1,0 +1,6 @@
+Esta aplicación de referencia usa EXCLUSIVAMENTE la biblioteca estándar de
+Python 3 (http.server, sqlite3, hashlib, secrets, json, urllib).
+
+No requiere instalar paquetes externos (no hay dependencias en PyPI).
+
+Requisito único: Python 3.9 o superior.
